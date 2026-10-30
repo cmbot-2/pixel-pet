@@ -7,6 +7,10 @@ if (!context) throw new Error('Canvas 2D is required to draw Mochi.');
 const ctx = context;
 ctx.imageSmoothingEnabled = false;
 const status = document.querySelector<HTMLElement>('#pet-status')!;
+const hungerMeter = document.querySelector<HTMLMeterElement>('#hunger')!;
+const hungerValue = document.querySelector<HTMLElement>('#hunger-value')!;
+let hunger = 65;
+const snackSize = 20;
 const messages: Record<Activity, string> = {
   idle: 'Mochi is happy you’re here.',
   feed: 'A tiny snack for a tiny friend.',
@@ -116,5 +120,14 @@ for (const button of buttons) {
     const activity = button.dataset.action as Exclude<Activity, 'idle'>;
     for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
     draw(activity);
+    if (activity === 'feed') {
+      const wasFull = hunger === 0;
+      hunger = Math.max(0, Math.min(100, hunger - snackSize));
+      hungerMeter.value = hunger;
+      hungerValue.textContent = `${hunger} / 100`;
+      status.textContent = wasFull
+        ? 'Mochi is already full. Save that snack for later.'
+        : hunger === 0 ? 'Mochi is full and content.' : `Snack enjoyed! Hunger is now ${hunger} out of 100.`;
+    }
   });
 }

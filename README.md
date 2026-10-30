@@ -2,7 +2,9 @@
 
 Meet Mochi, a little pixel pet in a room drawn with Canvas.
 
-Use Feed, Play, and Sleep to change Mochi's activity illustration and caption. The buttons are visual previews; the current build does not track needs or save progress.
+Mochi starts with 65 hunger out of 100; 0 means full. Each Feed lowers hunger by 20, stopping at 0. Feeding a full pet leaves the meter at 0 and shows a message. Play and Sleep change the illustration and caption.
+
+Hunger stays steady between snacks. Reloading resets the pet; progress is not saved yet.
 
 ## Run locally
 
