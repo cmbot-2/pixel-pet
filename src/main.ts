@@ -1,4 +1,5 @@
 import './style.css';
+import { createPet, feedPet, playWithPet } from './care';
 
 type Activity = 'idle' | 'feed' | 'play' | 'sleep';
 const canvas = document.querySelector<HTMLCanvasElement>('#room')!;
@@ -7,15 +8,12 @@ if (!context) throw new Error('Canvas 2D is required to draw Mochi.');
 const ctx = context;
 ctx.imageSmoothingEnabled = false;
 const status = document.querySelector<HTMLElement>('#pet-status')!;
-const hungerMeter = document.querySelector<HTMLMeterElement>('#hunger')!;
-const hungerValue = document.querySelector<HTMLElement>('#hunger-value')!;
-let hunger = 65;
-const snackSize = 20;
+let pet = createPet();
 const messages: Record<Activity, string> = {
   idle: 'Mochi is happy you’re here.',
   feed: 'A tiny snack for a tiny friend.',
   play: 'Mochi has found a favorite toy.',
-  sleep: 'Shh… a little afternoon daydream.',
+  sleep: 'A sleepy daydream. This preview leaves energy unchanged.',
 };
 
 function rect(x: number, y: number, width: number, height: number, color: string) {
@@ -84,7 +82,7 @@ function draw(activity: Activity) {
     G: '#678a6d', M: '#a9c994', C: '#d5dfad', B: '#e2b19c', E: '#3b5447', N: '#5d7661',
   };
   const petX = 62;
-  const petY = 62;
+  const petY = activity === 'play' ? 58 : 62;
   sprite.forEach((row, y) => [...row].forEach((pixel, x) => {
     if (pixel === '.' || pixel === ' ') return;
     const color = colors[activity === 'sleep' && pixel === 'E' ? 'M' : pixel];
@@ -105,29 +103,54 @@ function draw(activity: Activity) {
     rect(99, 90, 9, 3, '#956e51');
   }
   if (activity === 'play') {
+    rect(62, 48, 2, 6, '#d89792');
+    rect(60, 50, 6, 2, '#d89792');
+    rect(90, 45, 2, 6, '#d89792');
+    rect(88, 47, 6, 2, '#d89792');
     rect(101, 88, 9, 10, '#cb9da6');
     rect(103, 86, 5, 14, '#cb9da6');
     rect(103, 88, 2, 4, '#efd3c8');
     rect(101, 93, 9, 2, '#b58490');
   }
   status.textContent = messages[activity];
+  const reaction = { idle: 'rests on the rug', feed: 'enjoys a snack', play: 'bounces beside a pink ball with happy sparkles', sleep: 'daydreams with closed eyes' }[activity];
+  canvas.setAttribute('aria-label', `Mochi, a mint-green pixel cat, ${reaction} in a cozy room.`);
+}
+
+function renderNeeds() {
+  for (const need of ['hunger', 'happiness', 'energy'] as const) {
+    const meter = document.querySelector<HTMLMeterElement>('#' + need)!;
+    meter.value = pet[need];
+    meter.textContent = `${pet[need]} out of 100`;
+    document.querySelector('#' + need + '-value')!.textContent = `${pet[need]} / 100`;
+  }
 }
 
 draw('idle');
+renderNeeds();
 const buttons = document.querySelectorAll<HTMLButtonElement>('[data-action]');
 for (const button of buttons) {
   button.addEventListener('click', () => {
-    const activity = button.dataset.action as Exclude<Activity, 'idle'>;
-    for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
-    draw(activity);
+    let activity = button.dataset.action as Activity;
+    let message = messages[activity];
     if (activity === 'feed') {
-      const wasFull = hunger === 0;
-      hunger = Math.max(0, Math.min(100, hunger - snackSize));
-      hungerMeter.value = hunger;
-      hungerValue.textContent = `${hunger} / 100`;
-      status.textContent = wasFull
+      const wasFull = pet.hunger === 0;
+      pet = feedPet(pet);
+      message = wasFull
         ? 'Mochi is already full. Save that snack for later.'
-        : hunger === 0 ? 'Mochi is full and content.' : `Snack enjoyed! Hunger is now ${hunger} out of 100.`;
+        : pet.hunger === 0 ? 'Mochi is full and content.' : `Snack enjoyed! Hunger is now ${pet.hunger} out of 100.`;
     }
+    if (activity === 'play') {
+      const result = playWithPet(pet);
+      pet = result.pet;
+      message = result.played
+        ? `Mochi bounces with joy! Happiness ${pet.happiness}, energy ${pet.energy}.`
+        : 'Mochi is too tired for another game.';
+      if (!result.played) activity = 'idle';
+    }
+    for (const other of buttons) other.setAttribute('aria-pressed', String(other.dataset.action === activity));
+    draw(activity);
+    renderNeeds();
+    status.textContent = message;
   });
 }

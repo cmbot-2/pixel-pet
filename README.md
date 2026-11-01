@@ -2,9 +2,13 @@
 
 Meet Mochi, a little pixel pet in a room drawn with Canvas.
 
-Mochi starts with 65 hunger out of 100; 0 means full. Each Feed lowers hunger by 20, stopping at 0. Feeding a full pet leaves the meter at 0 and shows a message. Play and Sleep change the illustration and caption.
+Mochi starts with 65 hunger, 50 happiness, and 80 energy, each out of 100.
 
-Hunger stays steady between snacks. Reloading resets the pet; progress is not saved yet.
+- **Feed** lowers hunger by 20, stopping at 0 (full).
+- **Play** gives Mochi a happy bounce, adds 15 happiness up to 100, and uses 10 energy. Playing requires at least 10 energy; a tired pet keeps its stats unchanged. Playing at full happiness still uses energy.
+- **Sleep preview** shows a sleepy pose and leaves the meters unchanged.
+
+Needs stay steady between actions. Reloading starts a fresh visit with the initial stats; progress is not saved yet.
 
 ## Run locally
 
@@ -20,6 +24,7 @@ Open the local URL printed in the terminal.
 ## Development
 
 ```sh
+npm test        # Run regression checks
 npm run check   # Check TypeScript
 npm run build   # Check types and build into dist/
 npm run preview # Serve the build locally
