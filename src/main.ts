@@ -1,5 +1,5 @@
 import './style.css';
-import { createPet, feedPet, playWithPet } from './care';
+import { createPet, feedPet, playWithPet, recoverEnergy, sleepPet, wakePet } from './care';
 
 type Activity = 'idle' | 'feed' | 'play' | 'sleep';
 const canvas = document.querySelector<HTMLCanvasElement>('#room')!;
@@ -9,11 +9,14 @@ const ctx = context;
 ctx.imageSmoothingEnabled = false;
 const status = document.querySelector<HTMLElement>('#pet-status')!;
 let pet = createPet();
+let sleepTimer: ReturnType<typeof setInterval> | undefined;
+let lastRestTime = 0;
+const sleepButton = document.querySelector<HTMLButtonElement>('[data-action="sleep"]')!;
 const messages: Record<Activity, string> = {
   idle: 'Mochi is happy you’re here.',
   feed: 'A tiny snack for a tiny friend.',
   play: 'Mochi has found a favorite toy.',
-  sleep: 'A sleepy daydream. This preview leaves energy unchanged.',
+  sleep: 'Mochi is sleeping. Energy restores by 5 each second. Choose Wake up when ready.',
 };
 
 function rect(x: number, y: number, width: number, height: number, color: string) {
@@ -113,7 +116,7 @@ function draw(activity: Activity) {
     rect(101, 93, 9, 2, '#b58490');
   }
   status.textContent = messages[activity];
-  const reaction = { idle: 'rests on the rug', feed: 'enjoys a snack', play: 'bounces beside a pink ball with happy sparkles', sleep: 'daydreams with closed eyes' }[activity];
+  const reaction = { idle: 'rests on the rug', feed: 'enjoys a snack', play: 'bounces beside a pink ball with happy sparkles', sleep: 'sleeps with closed eyes' }[activity];
   canvas.setAttribute('aria-label', `Mochi, a mint-green pixel cat, ${reaction} in a cozy room.`);
 }
 
@@ -126,6 +129,25 @@ function renderNeeds() {
   }
 }
 
+function stopSleepTimer() {
+  if (sleepTimer !== undefined) clearInterval(sleepTimer);
+  sleepTimer = undefined;
+}
+
+function updateSleep() {
+  if (!pet.sleeping) return;
+  const now = performance.now();
+  const seconds = Math.floor((now - lastRestTime) / 1000);
+  if (seconds < 1) return;
+  lastRestTime += seconds * 1000;
+  pet = recoverEnergy(pet, seconds);
+  renderNeeds();
+  if (pet.energy === 100) {
+    stopSleepTimer();
+    status.textContent = 'Fully rested! Mochi will keep sleeping until you choose Wake up.';
+  }
+}
+
 draw('idle');
 renderNeeds();
 const buttons = document.querySelectorAll<HTMLButtonElement>('[data-action]');
@@ -133,6 +155,25 @@ for (const button of buttons) {
   button.addEventListener('click', () => {
     let activity = button.dataset.action as Activity;
     let message = messages[activity];
+    updateSleep();
+    if (pet.sleeping && activity !== 'sleep') {
+      status.textContent = `Mochi is sleeping. Choose Wake up before ${activity === 'feed' ? 'feeding' : 'playing'}.`;
+      return;
+    }
+    if (activity === 'sleep') {
+      if (pet.sleeping) {
+        stopSleepTimer();
+        pet = wakePet(pet);
+        activity = 'idle';
+        message = `Good morning, Mochi! Energy is ${pet.energy} out of 100.`;
+      } else {
+        pet = sleepPet(pet);
+        lastRestTime = performance.now();
+        if (pet.energy < 100) sleepTimer = setInterval(updateSleep, 250);
+        else message = 'Mochi is already fully rested. Choose Wake up whenever you like.';
+      }
+      sleepButton.querySelector('.action-label')!.textContent = pet.sleeping ? 'Wake up' : 'Sleep';
+    }
     if (activity === 'feed') {
       const wasFull = pet.hunger === 0;
       pet = feedPet(pet);
@@ -145,7 +186,7 @@ for (const button of buttons) {
       pet = result.pet;
       message = result.played
         ? `Mochi bounces with joy! Happiness ${pet.happiness}, energy ${pet.energy}.`
-        : 'Mochi is too tired for another game.';
+        : 'Mochi is too tired for another game. Choose Sleep to restore energy.';
       if (!result.played) activity = 'idle';
     }
     for (const other of buttons) other.setAttribute('aria-pressed', String(other.dataset.action === activity));
@@ -154,3 +195,10 @@ for (const button of buttons) {
     status.textContent = message;
   });
 }
+window.addEventListener('pagehide', stopSleepTimer);
+window.addEventListener('pageshow', () => {
+  if (pet.sleeping && sleepTimer === undefined) {
+    updateSleep();
+    if (pet.energy < 100) sleepTimer = setInterval(updateSleep, 250);
+  }
+});

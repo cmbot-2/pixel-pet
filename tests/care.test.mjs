@@ -6,10 +6,10 @@ test('playing adds happiness, spends energy, and leaves hunger unchanged', () =>
   const pet = createPet();
   const result = playWithPet(pet);
   assert.equal(result.played, true);
-  assert.deepEqual(result.pet, { hunger: 65, happiness: 65, energy: 70 });
-  assert.deepEqual(pet, { hunger: 65, happiness: 50, energy: 80 });
+  assert.deepEqual(result.pet, { hunger: 65, happiness: 65, energy: 70, sleeping: false });
+  assert.deepEqual(pet, { hunger: 65, happiness: 50, energy: 80, sleeping: false });
   assert.deepEqual(playWithPet({ ...pet, happiness: 95, energy: 10 }).pet,
-    { hunger: 65, happiness: 100, energy: 0 });
+    { hunger: 65, happiness: 100, energy: 0, sleeping: false });
 });
 
 test('repeated play stops at exhaustion without extra rewards or negative energy', () => {
@@ -20,15 +20,15 @@ test('repeated play stops at exhaustion without extra rewards or negative energy
     pet = result.pet;
     assert(pet.happiness <= 100 && pet.energy >= 0);
   }
-  assert.deepEqual(pet, { hunger: 65, happiness: 100, energy: 0 });
+  assert.deepEqual(pet, { hunger: 65, happiness: 100, energy: 0, sleeping: false });
   for (let index = 0; index < 20; index++) assert.deepEqual(playWithPet(pet), { pet, played: false });
   const tired = { ...pet, energy: 9, happiness: 40 };
   assert.deepEqual(playWithPet(tired), { pet: tired, played: false });
-  assert.deepEqual(createPet(), { hunger: 65, happiness: 50, energy: 80 });
+  assert.deepEqual(createPet(), { hunger: 65, happiness: 50, energy: 80, sleeping: false });
 });
 
 test('snacks bound hunger without changing happiness or replenishing energy', () => {
   let pet = playWithPet(createPet()).pet;
   for (let index = 0; index < 10; index++) pet = feedPet(pet);
-  assert.deepEqual(pet, { hunger: 0, happiness: 65, energy: 70 });
+  assert.deepEqual(pet, { hunger: 0, happiness: 65, energy: 70, sleeping: false });
 });
