@@ -1,5 +1,6 @@
 import './style.css';
-import { createPet, feedPet, playWithPet, recoverEnergy, sleepPet, wakePet } from './care';
+import { createPet, feedPet, playWithPet, sleepPet, wakePet } from './care';
+import { advanceCare } from './elapsed';
 
 type Activity = 'idle' | 'feed' | 'play' | 'sleep';
 const canvas = document.querySelector<HTMLCanvasElement>('#room')!;
@@ -8,9 +9,11 @@ if (!context) throw new Error('Canvas 2D is required to draw Mochi.');
 const ctx = context;
 ctx.imageSmoothingEnabled = false;
 const status = document.querySelector<HTMLElement>('#pet-status')!;
-let pet = createPet();
-let sleepTimer: ReturnType<typeof setInterval> | undefined;
-let lastRestTime = 0;
+let care = { pet: createPet(), updatedAt: Date.now() };
+let needsTimer: ReturnType<typeof setInterval> | undefined;
+let pageActive = true;
+let active = !document.hidden;
+const display = (value: number) => Math.round(value);
 const sleepButton = document.querySelector<HTMLButtonElement>('[data-action="sleep"]')!;
 const messages: Record<Activity, string> = {
   idle: 'Mochi is happy you’re here.',
@@ -123,29 +126,37 @@ function draw(activity: Activity) {
 function renderNeeds() {
   for (const need of ['hunger', 'happiness', 'energy'] as const) {
     const meter = document.querySelector<HTMLMeterElement>('#' + need)!;
-    meter.value = pet[need];
-    meter.textContent = `${pet[need]} out of 100`;
-    document.querySelector('#' + need + '-value')!.textContent = `${pet[need]} / 100`;
+    meter.value = care.pet[need];
+    meter.textContent = `${display(care.pet[need])} out of 100`;
+    document.querySelector('#' + need + '-value')!.textContent = `${display(care.pet[need])} / 100`;
   }
 }
 
-function stopSleepTimer() {
-  if (sleepTimer !== undefined) clearInterval(sleepTimer);
-  sleepTimer = undefined;
+function stopNeedsTimer() {
+  if (needsTimer !== undefined) clearInterval(needsTimer);
+  needsTimer = undefined;
 }
 
-function updateSleep() {
-  if (!pet.sleeping) return;
-  const now = performance.now();
-  const seconds = Math.floor((now - lastRestTime) / 1000);
-  if (seconds < 1) return;
-  lastRestTime += seconds * 1000;
-  pet = recoverEnergy(pet, seconds);
+function updateNeeds() {
+  const energyBefore = care.pet.energy;
+  care = advanceCare(care, Date.now());
   renderNeeds();
-  if (pet.energy === 100) {
-    stopSleepTimer();
+  if (care.pet.sleeping && energyBefore < 100 && care.pet.energy === 100) {
     status.textContent = 'Fully rested! Mochi will keep sleeping until you choose Wake up.';
   }
+}
+
+function startNeedsTimer() {
+  if (active && needsTimer === undefined) needsTimer = setInterval(updateNeeds, 1000);
+}
+
+function syncActivity() {
+  const next = pageActive && !document.hidden;
+  if (next === active) return;
+  updateNeeds();
+  active = next;
+  if (active) startNeedsTimer();
+  else stopNeedsTimer();
 }
 
 draw('idle');
@@ -155,37 +166,34 @@ for (const button of buttons) {
   button.addEventListener('click', () => {
     let activity = button.dataset.action as Activity;
     let message = messages[activity];
-    updateSleep();
-    if (pet.sleeping && activity !== 'sleep') {
+    updateNeeds();
+    if (care.pet.sleeping && activity !== 'sleep') {
       status.textContent = `Mochi is sleeping. Choose Wake up before ${activity === 'feed' ? 'feeding' : 'playing'}.`;
       return;
     }
     if (activity === 'sleep') {
-      if (pet.sleeping) {
-        stopSleepTimer();
-        pet = wakePet(pet);
+      if (care.pet.sleeping) {
+        care.pet = wakePet(care.pet);
         activity = 'idle';
-        message = `Good morning, Mochi! Energy is ${pet.energy} out of 100.`;
+        message = `Good morning, Mochi! Energy is ${display(care.pet.energy)} out of 100.`;
       } else {
-        pet = sleepPet(pet);
-        lastRestTime = performance.now();
-        if (pet.energy < 100) sleepTimer = setInterval(updateSleep, 250);
-        else message = 'Mochi is already fully rested. Choose Wake up whenever you like.';
+        care.pet = sleepPet(care.pet);
+        if (care.pet.energy === 100) message = 'Mochi is already fully rested. Choose Wake up whenever you like.';
       }
-      sleepButton.querySelector('.action-label')!.textContent = pet.sleeping ? 'Wake up' : 'Sleep';
+      sleepButton.querySelector('.action-label')!.textContent = care.pet.sleeping ? 'Wake up' : 'Sleep';
     }
     if (activity === 'feed') {
-      const wasFull = pet.hunger === 0;
-      pet = feedPet(pet);
+      const wasFull = care.pet.hunger === 0;
+      care.pet = feedPet(care.pet);
       message = wasFull
         ? 'Mochi is already full. Save that snack for later.'
-        : pet.hunger === 0 ? 'Mochi is full and content.' : `Snack enjoyed! Hunger is now ${pet.hunger} out of 100.`;
+        : care.pet.hunger === 0 ? 'Mochi is full and content.' : `Snack enjoyed! Hunger is now ${display(care.pet.hunger)} out of 100.`;
     }
     if (activity === 'play') {
-      const result = playWithPet(pet);
-      pet = result.pet;
+      const result = playWithPet(care.pet);
+      care.pet = result.pet;
       message = result.played
-        ? `Mochi bounces with joy! Happiness ${pet.happiness}, energy ${pet.energy}.`
+        ? `Mochi bounces with joy! Happiness ${display(care.pet.happiness)}, energy ${display(care.pet.energy)}.`
         : 'Mochi is too tired for another game. Choose Sleep to restore energy.';
       if (!result.played) activity = 'idle';
     }
@@ -195,10 +203,7 @@ for (const button of buttons) {
     status.textContent = message;
   });
 }
-window.addEventListener('pagehide', stopSleepTimer);
-window.addEventListener('pageshow', () => {
-  if (pet.sleeping && sleepTimer === undefined) {
-    updateSleep();
-    if (pet.energy < 100) sleepTimer = setInterval(updateSleep, 250);
-  }
-});
+document.addEventListener('visibilitychange', syncActivity);
+window.addEventListener('pagehide', () => { pageActive = false; syncActivity(); });
+window.addEventListener('pageshow', () => { pageActive = true; syncActivity(); });
+startNeedsTimer();

@@ -6,10 +6,14 @@ Mochi starts with 65 hunger, 50 happiness, and 80 energy, each out of 100.
 
 - **Feed** lowers hunger by 20, stopping at 0 (full).
 - **Play** gives Mochi a happy bounce, adds 15 happiness up to 100, and uses 10 energy. Playing requires at least 10 energy; a tired pet keeps its stats unchanged. Playing at full happiness still uses energy.
-- **Sleep** closes Mochi's eyes and restores 5 energy per full second, up to 100. The button becomes **Wake up**. Mochi stays asleep at full energy until you wake it.
-- Feeding and playing while asleep leave the stats unchanged and remind you to wake Mochi first.
+- **Sleep** closes Mochi's eyes and restores 5 energy per second, up to 100. The button becomes **Wake up**. Mochi stays asleep at full energy until you wake it.
+- Feeding and playing while asleep do not apply their action effects and remind you to wake Mochi first.
 
-Hunger and happiness stay steady between actions. Energy recovers only while sleeping; delayed updates catch up to the 100-point cap while the page is open. Waking stops recovery immediately. Reloading starts a fresh, awake visit with the initial stats; progress is not saved yet.
+Needs change with elapsed time: hunger rises by 2 per minute, happiness falls by 1 per minute, and awake energy falls by 1 per minute. Hunger and happiness also change during sleep. Values stay between 0 and 100; meters show rounded numbers, while fractional changes are retained. Care actions first settle elapsed time, and waking stops sleep recovery immediately.
+
+Hidden tabs stop their update timer. Returning applies at most five minutes of elapsed time, so even a long absence adds at most 10 hunger and removes at most 5 happiness and 5 awake energy. Sleeping can restore energy to 100 during that time. A delayed foreground update has the same five-minute cap; extra time is discarded once. Backward clock changes freeze needs until the last recorded time is reached again. Mochi never dies or disappears, and feeding, rest, and play can always restore needs.
+
+These rules apply while the page remains open, including returning from the browser’s page cache. Reloading starts a fresh, awake visit with the initial stats; progress is not saved yet.
 
 ## Run locally
 

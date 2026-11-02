@@ -2,6 +2,10 @@ export type Pet = { hunger: number; happiness: number; energy: number; sleeping:
 export const playHappiness = 15;
 export const playEnergy = 10;
 export const sleepEnergyPerSecond = 5;
+export const maxElapsedSeconds = 5 * 60;
+export const hungerPerSecond = 2 / 60;
+export const happinessPerSecond = 1 / 60;
+export const awakeEnergyPerSecond = 1 / 60;
 
 export function createPet(): Pet {
   return { hunger: 65, happiness: 50, energy: 80, sleeping: false };
@@ -28,7 +32,15 @@ export function wakePet(pet: Pet): Pet {
   return pet.sleeping ? { ...pet, sleeping: false } : pet;
 }
 
-export function recoverEnergy(pet: Pet, seconds: number): Pet {
-  if (!pet.sleeping || pet.energy === 100 || !Number.isFinite(seconds) || seconds < 1) return pet;
-  return { ...pet, energy: Math.min(100, pet.energy + Math.floor(seconds) * sleepEnergyPerSecond) };
+export function advanceNeeds(pet: Pet, seconds: number): Pet {
+  if (!Number.isFinite(seconds) || seconds <= 0) return pet;
+  const elapsed = Math.min(seconds, maxElapsedSeconds);
+  return {
+    ...pet,
+    hunger: Math.min(100, pet.hunger + elapsed * hungerPerSecond),
+    happiness: Math.max(0, pet.happiness - elapsed * happinessPerSecond),
+    energy: pet.sleeping
+      ? Math.min(100, pet.energy + elapsed * sleepEnergyPerSecond)
+      : Math.max(0, pet.energy - elapsed * awakeEnergyPerSecond),
+  };
 }
