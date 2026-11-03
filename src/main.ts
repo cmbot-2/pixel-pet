@@ -1,6 +1,7 @@
 import './style.css';
-import { createPet, feedPet, playWithPet, sleepPet, wakePet } from './care';
+import { feedPet, playWithPet, sleepPet, wakePet } from './care';
 import { advanceCare } from './elapsed';
+import { restoreCare, saveKey, serializeCare } from './save';
 
 type Activity = 'idle' | 'feed' | 'play' | 'sleep';
 const canvas = document.querySelector<HTMLCanvasElement>('#room')!;
@@ -9,7 +10,11 @@ if (!context) throw new Error('Canvas 2D is required to draw Mochi.');
 const ctx = context;
 ctx.imageSmoothingEnabled = false;
 const status = document.querySelector<HTMLElement>('#pet-status')!;
-let care = { pet: createPet(), updatedAt: Date.now() };
+const saveStatus = document.querySelector<HTMLElement>('#save-status')!;
+let saved: string | null = null;
+try { saved = localStorage.getItem(saveKey); } catch { /* Care still works without storage. */ }
+const restored = restoreCare(saved, Date.now());
+let care = restored.state;
 let needsTimer: ReturnType<typeof setInterval> | undefined;
 let pageActive = true;
 let active = !document.hidden;
@@ -132,6 +137,19 @@ function renderNeeds() {
   }
 }
 
+function saveProgress() {
+  let message: string;
+  try {
+    localStorage.setItem(saveKey, serializeCare(care));
+    message = restored.status === 'invalid'
+      ? 'The previous save could not be read. A fresh visit is now saved in this browser.'
+      : 'Progress saved in this browser. Reload to continue caring for Mochi.';
+  } catch {
+    message = 'Progress cannot be saved in this browser. Keep this page open to continue this visit.';
+  }
+  if (saveStatus.textContent !== message) saveStatus.textContent = message;
+}
+
 function stopNeedsTimer() {
   if (needsTimer !== undefined) clearInterval(needsTimer);
   needsTimer = undefined;
@@ -141,6 +159,7 @@ function updateNeeds() {
   const energyBefore = care.pet.energy;
   care = advanceCare(care, Date.now());
   renderNeeds();
+  saveProgress();
   if (care.pet.sleeping && energyBefore < 100 && care.pet.energy === 100) {
     status.textContent = 'Fully rested! Mochi will keep sleeping until you choose Wake up.';
   }
@@ -159,8 +178,12 @@ function syncActivity() {
   else stopNeedsTimer();
 }
 
-draw('idle');
+draw(care.pet.sleeping ? 'sleep' : 'idle');
+sleepButton.querySelector('.action-label')!.textContent = care.pet.sleeping ? 'Wake up' : 'Sleep';
+sleepButton.setAttribute('aria-pressed', String(care.pet.sleeping));
 renderNeeds();
+// Save the settled timestamp immediately so reloading cannot recount time away.
+saveProgress();
 const buttons = document.querySelectorAll<HTMLButtonElement>('[data-action]');
 for (const button of buttons) {
   button.addEventListener('click', () => {
@@ -200,6 +223,7 @@ for (const button of buttons) {
     for (const other of buttons) other.setAttribute('aria-pressed', String(other.dataset.action === activity));
     draw(activity);
     renderNeeds();
+    saveProgress();
     status.textContent = message;
   });
 }
